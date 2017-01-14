@@ -80,11 +80,6 @@ class FileDescriptorInfo {
       return NULL;
     }
 
-    if (f_stat.st_nlink <= 0) {
-      ALOGE("The fd %d corresponding file has been deleted", fd);
-      return NULL;
-    }
-
     if (S_ISSOCK(f_stat.st_mode)) {
       std::string socket_name;
       if (!GetSocketName(fd, &socket_name)) {
@@ -167,14 +162,11 @@ class FileDescriptorInfo {
   // refers to the same description.
   bool Restat() const {
     struct stat f_stat;
-
     if (TEMP_FAILURE_RETRY(fstat(fd, &f_stat)) == -1) {
-      ALOGE("Failed stat fd %d, file path %s", fd, file_path.c_str());
       return false;
     }
 
-    return (f_stat.st_ino == file_stat.st_ino) && (f_stat.st_dev == file_stat.st_dev) &&
-           (f_stat.st_nlink > 0);
+    return f_stat.st_ino == stat.st_ino && f_stat.st_dev == stat.st_dev;
   }
 
   bool ReopenOrDetach() const {
@@ -222,7 +214,7 @@ class FileDescriptorInfo {
   }
 
   const int fd;
-  const struct stat file_stat;
+  const struct stat stat;
   const std::string file_path;
   const int open_flags;
   const int fd_flags;
@@ -233,7 +225,7 @@ class FileDescriptorInfo {
  private:
   FileDescriptorInfo(int fd) :
     fd(fd),
-    file_stat(),
+    stat(),
     open_flags(0),
     fd_flags(0),
     fs_flags(0),
@@ -241,10 +233,10 @@ class FileDescriptorInfo {
     is_sock(true) {
   }
 
-  FileDescriptorInfo(struct stat file_stat, const std::string& file_path, int fd, int open_flags,
+  FileDescriptorInfo(struct stat stat, const std::string& file_path, int fd, int open_flags,
                      int fd_flags, int fs_flags, off_t offset) :
     fd(fd),
-    file_stat(file_stat),
+    stat(stat),
     file_path(file_path),
     open_flags(open_flags),
     fd_flags(fd_flags),
